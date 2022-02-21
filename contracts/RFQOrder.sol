@@ -43,11 +43,50 @@ abstract contract RFQOrder is EIP712 {
     function _invalidateOrder(address maker, uint256 orderInfo) private {
         uint256 invalidatorSlot = uint64(orderInfo) >> 8;
         uint256 invalidatorBit = 1 << uint8(orderInfo);
-        mapping(uint256 => uint256) storage invalidatorStorage = _invalidator[
-            maker
-        ];
+        mapping(uint256 => uint256) storage invalidatorStorage = _invalidator[maker];
         uint256 invalidator = invalidatorStorage[invalidatorSlot];
         require(invalidator & invalidatorBit == 0, "LOP: invalidator order");
         invalidatorStorage[invalidatorSlot] = invalidator | invalidatorBit;
     }
+
+    /// @notice Fills order's quote, fully or partially (whichever is possible)
+    /// @param order Order quote to fill
+    /// @param signature Signature to confirm quote ownership
+    /// @param makingAmount Making amount
+    /// @param takingAmount Taking amount
+    function fillRFQOrder(
+        OrderRFQ memory order,
+        bytes calldata signature,
+        uint256 makingAmount,
+        uint256 takingAmount
+    ) external returns(uint256, uint256) {
+        return fillRFQOrderTo(order, signature, makingAmount, takingAmount, msg.sender);
+    }
+
+    /// @notice Same as `fillOrderRFQ` but allows to specify funds destination instead of `msg.sender`
+    /// @param order Order quote to fill
+    /// @param signature Signature to confirm quote ownership
+    /// @param makingAmount Making amount
+    /// @param takingAmount Taking amount
+    /// @param target Address that will receive swap funds
+    function fillRFQOrderTo(
+        OrderRFQ memory order,
+        bytes calldata signature,
+        uint256 makingAmount,
+        uint256 takingAmount,
+        address target
+    ) public returns(uint256, uint256) {
+        require(target != address(0), "LOP: zero target is forbidden");
+
+        address maker = order.maker;
+
+        //validate order
+        require(order.allowedSender == address(0) || order.allowedSender == msg.sender, "LOP: private order");
+
+        uint256 info = order.info;
+        uint256 expiration = uint128(info) >> 64;
+
+    }
+
+
 }
