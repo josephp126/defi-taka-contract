@@ -65,6 +65,27 @@ abstract contract RFQOrder is EIP712, AmountCalculator {
         return fillRFQOrderTo(order, signature, makingAmount, takingAmount, msg.sender);
     }
 
+    /// @notice Fills Same as `fillRFQOrderTo` but calls permit first,
+    /// allowing to approve token spending and make a swap in one transaction.
+    /// Also allows to specify funds destination instead of `msg.sender`
+    /// @param order Order quote to fill
+    /// @param signature Signature to confirm quote ownership
+    /// @param makingAmount Making amount
+    /// @param takingAmount Taking amount
+    /// @param target Address that will receive swap funds
+    /// @param permit Should consist of abiencoded token address and encoded `IERC20Permit.permit` call.
+    /// @dev See tests for examples
+    function fillRFQOrderToWithPermit(
+        OrderRFQ memory order,
+        bytes calldata signature,
+        uint256 makingAmount,
+        uint256 takingAmount,
+        address target,
+        bytes calldata permit
+    ) external returns(uint256, uint256) {
+        return fillRFQOrderTo(order, signature, makingAmount, takingAmount, target);
+    }
+
     /// @notice Same as `fillOrderRFQ` but allows to specify funds destination instead of `msg.sender`
     /// @param order Order quote to fill
     /// @param signature Signature to confirm quote ownership
