@@ -82,9 +82,40 @@ abstract contract RFQOrder is EIP712 {
 
         //validate order
         require(order.allowedSender == address(0) || order.allowedSender == msg.sender, "LOP: private order");
+        bytes32 orderHash = _hashTypedDataV4(keccak256(abi.encode(LIMIT_ORDER_RFQ_TYPEHASH, order)));
+        require(SignatureChecker.isValidSignatureNow(maker, orderHash, signature), "LOP: bad signature");
+
 
         uint256 info = order.info;
         uint256 expiration = uint128(info) >> 64;
+        require(expiration == 0 || block.timestamp <= expiration, "LOP: order expired");
+        _invalidateOrder(maker, info);
+
+        uint256 orderMakingAmount = order.makingAmount;
+        uint256 orderTakingAmount = order.takingAmount;
+
+        if(takingAmount == 0 && makingAmount == 0) {
+            makingAmount = orderMakingAmount;
+            takingAmount = orderTakingAmount;
+        } else if (takingAmount == 0) {
+            require(makingAmount <= orderMakingAmount, "LOP: making amount exceeded");
+            // takingAmount = getTakerAmount(orderMakingAmount, orderTakingAmount, makingAmount);   
+        } else if (makingAmount == 0) {
+            require(takingAmount <= orderTakingAmount, "LOP: taking amount exceeded");
+            // makingAmount = getMakerAmount(orderMakingAmount, orderTakingAmount, takingAmount);
+        } else {
+            revert("LOP: both amounts are non-zero");
+        }
+
+        require(makingAmount > 0 && takingAmount > 0, "LOP: can't swap 0 amount");
+
+        // Maker => Taker, Taker => Maker
+        order.makerAsset.safeTransferFrom(maker, target, makingAmount);
+        order.takerAsset.safeTransferFrom(msg.sender, maker, takingAmount);
+
+        emit OrderFilledRFQ(orderHash, makingAmount);
+        return (makingAmount, takingAmount);
+
 
     }
 
