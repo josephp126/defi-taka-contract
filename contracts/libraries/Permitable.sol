@@ -2,6 +2,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
+import "../interfaces/IDaiLikePermit.sol";
 
 /// @title Base contract with common permit handling logics
 abstract contract Permitable {
@@ -12,7 +13,7 @@ abstract contract Permitable {
             if (permit.length == 32 * 7) {
                 (success, result) = token.call(abi.encodePacked(IERC20Permit.permit.selector, permit));
             } else if (permit.length == 32 * 8) {
-                
+                (success, result) = token.call(abi.encodePacked(IDaiLikePermit.permit.selector, permit));
             } else {
                 revert("Wrong permit length");
             }
