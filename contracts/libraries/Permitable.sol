@@ -2,7 +2,9 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
+import "./RevertReasonParser.sol";
 import "../interfaces/IDaiLikePermit.sol";
+
 
 /// @title Base contract with common permit handling logics
 abstract contract Permitable {
@@ -18,7 +20,7 @@ abstract contract Permitable {
                 revert("Wrong permit length");
             }
             if (!success) {
-                
+                revert(RevertReasonParser.parse(result, "Permit failed: "));
             }
         }
     }
