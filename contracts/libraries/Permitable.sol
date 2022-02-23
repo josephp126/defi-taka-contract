@@ -17,7 +17,9 @@ abstract contract Permitable {
             } else {
                 revert("Wrong permit length");
             }
-           
+            if (!success) {
+
+            }
         }
     }
 }
