@@ -112,6 +112,7 @@ abstract contract RFQOrder is EIP712, AmountCalculator, Permitable {
 
 
         uint256 info = order.info;
+        // Check time expiration
         uint256 expiration = uint128(info) >> 64;
         require(expiration == 0 || block.timestamp <= expiration, "LOP: order expired");
         _invalidateOrder(maker, info);
@@ -119,7 +120,9 @@ abstract contract RFQOrder is EIP712, AmountCalculator, Permitable {
         uint256 orderMakingAmount = order.makingAmount;
         uint256 orderTakingAmount = order.takingAmount;
 
+        // Compute partial fill if needed
         if(takingAmount == 0 && makingAmount == 0) {
+            // Two zeros mean whole order
             makingAmount = orderMakingAmount;
             takingAmount = orderTakingAmount;
         } else if (takingAmount == 0) {
@@ -140,9 +143,5 @@ abstract contract RFQOrder is EIP712, AmountCalculator, Permitable {
 
         emit OrderFilledRFQ(orderHash, makingAmount);
         return (makingAmount, takingAmount);
-
-
     }
-
-
 }
