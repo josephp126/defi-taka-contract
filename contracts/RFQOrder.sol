@@ -6,10 +6,11 @@ import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import "./Utils/AmountCalculator.sol";
+import "./utils/AmountCalculator.sol";
+import "./libraries/Permitable.sol";
 
 /// @title RFQ Limit Order
-abstract contract RFQOrder is EIP712, AmountCalculator {
+abstract contract RFQOrder is EIP712, AmountCalculator, Permitable {
     using SafeERC20 for IERC20;
     
     /// @notice Emitted when RFQ gets filled
@@ -83,6 +84,7 @@ abstract contract RFQOrder is EIP712, AmountCalculator {
         address target,
         bytes calldata permit
     ) external returns(uint256, uint256) {
+        _permit(address(order.takerAsset), permit);
         return fillRFQOrderTo(order, signature, makingAmount, takingAmount, target);
     }
 
