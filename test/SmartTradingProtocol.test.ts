@@ -1,17 +1,18 @@
-import { expectRevert, BN, time, constants } from '@openzeppelin/test-helpers';
+import { expectRevert, time, constants } from '@openzeppelin/test-helpers';
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Signer } from "ethers";
+import { Contract, Signer, BigNumber } from "ethers";
 
-import { bufferToHex } from 'ethereumjs-util';
 import ethSigUtil from 'eth-sig-util';
 import Wallet from 'ethereumjs-wallet'
-
+import {SmartTradingProtocol} from '../typechain-types'
 import { buildOrderRFQData } from './helpers/orderUtils';
-import { toBN } from './helpers/utils';
 
 describe("SmartTradingProtocol", async function () {
-    let addr1:any, wallet: any, accounts: Signer[];
+    let addr1:Signer;
+    let  wallet: Signer;
+    let accounts: Signer[];
+    let swap: SmartTradingProtocol;
     const privatekey = '59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
     const account = Wallet.fromPrivateKey(Buffer.from(privatekey, 'hex'));
 
@@ -28,53 +29,56 @@ describe("SmartTradingProtocol", async function () {
     }
 
     before(async function () {
-        // [addr1, wallet] = await web3.eth.getAccounts();
+        accounts = await ethers.getSigners();
+        [addr1, wallet] = accounts;
     });
 
     beforeEach(async function () {
-        // this.dai = await TokenMock.new('DAI', 'DAI');
-        // this.weth = await WrappedTokenMock.new('WETH', 'WETH');
-        accounts = await ethers.getSigners();
-        this.swap = await ethers.getContractFactory("SmartTradingProtocol");
+        const TokenMock = await ethers.getContractFactory("TokenMock");
+        const WrappedTokenMock = await ethers.getContractFactory("WrappedTokenMock");
+        const SmartTradingProtocol = await ethers.getContractFactory("SmartTradingProtocol");
+        this.dai = await TokenMock.deploy('DAI', 'DAI');
+        this.weth = await WrappedTokenMock.deploy('WETH', 'WETH');
+        swap = await SmartTradingProtocol.deploy();
 
-        // We get the chain id from the contract because Ganache (used for coverage) does not return the same chain id
-        // from within the EVM as from the JSON RPC interface.
-        // See https://github.com/trufflesuite/ganache-core/issues/515
+        await this.dai.deployed();
+        await this.weth.deployed();
+        await swap.deployed();
         this.chainId = await this.dai.getChainId();
 
-        await this.dai.mint(wallet, '1000000');
-        await this.weth.mint(wallet, '1000000');
-        await this.dai.mint(addr1, '1000000');
-        await this.weth.mint(addr1, '1000000');
+        await this.dai.mint(await wallet.getAddress(), '1000000');
+        await this.weth.mint(await wallet.getAddress(), '1000000');
+        await this.dai.mint(await addr1.getAddress(), '1000000');
+        await this.weth.mint(await addr1.getAddress(), '1000000');
 
-        await this.dai.approve(this.swap.address, '1000000');
-        await this.weth.approve(this.swap.address, '1000000');
-        await this.dai.approve(this.swap.address, '1000000', { from: wallet });
-        await this.weth.approve(this.swap.address, '1000000', { from: wallet });
+        await this.dai.approve(swap.address, '1000000');
+        await this.weth.approve(swap.address, '1000000');
+        // await this.dai.approve(swap.address, '1000000', { from: await wallet.getAddress() });
+        // await this.weth.approve(swap.address, '1000000', { from: await wallet.getAddress() });
     });
 
     describe('OrderRFQ Cancelation', async function () {
         it('should cancel own order', async function () {
-            await this.swap.cancelOrderRFQ('1');
-            const invalidator = await this.swap.invalidatorForOrderRFQ(addr1, '0');
-            expect(invalidator).to.equal(toBN('2'));
+            await swap.cancelOrderRFQ('1');
+            const invalidator = await swap.invalidatorForOrderRFQ(await addr1.getAddress(), '0');
+            expect(BigNumber.from(invalidator)).to.be.equal(BigNumber.from('2'));
         });
 
         it('should cancel own order with huge number', async function () {
-            await this.swap.cancelOrderRFQ('1023');
-            const invalidator = await this.swap.invalidatorForOrderRFQ(addr1, '3');
-            expect(invalidator).to.equal(toBN('1').shln(255));
+            await swap.cancelOrderRFQ('1023');
+            const invalidator = await swap.invalidatorForOrderRFQ(await addr1.getAddress(), '3');
+            expect(BigNumber.from(invalidator)).to.equal(BigNumber.from('1').shl(255));
         });
 
         it('should not fill cancelled order', async function () {
             const order = buildOrderRFQ('1', this.dai, this.weth, 1, 1);
-            const data = buildOrderRFQData(this.chainId, this.swap.address, order);
+            const data = buildOrderRFQData(this.chainId, swap.address, order);
             // const signature = ethSigUtil.signTypedMessage(account.getPrivateKey(), { data });
 
-            await this.swap.cancelOrderRFQ('1', { from: wallet });
+            // await swap.cancelOrderRFQ('1', { from: wallet });
 
             // await expectRevert(
-            //     this.swap.fillOrderRFQ(order, signature, 1, 0),
+            //     swap.fillOrderRFQ(order, signature, 1, 0),
             //     'LOP: invalidated order',
             // );
         });

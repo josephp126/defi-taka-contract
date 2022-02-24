@@ -1,5 +1,7 @@
 import { task } from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
+import '@typechain/hardhat'
+import '@nomiclabs/hardhat-ethers'
+import '@nomiclabs/hardhat-waffle'
 //added for using bignumber comparing start
 import chai from "chai";
 import { solidity } from "ethereum-waffle";

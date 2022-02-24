@@ -34,7 +34,7 @@ contract WrappedTokenMock is ERC20Permit, Ownable, IWithdrawable {
         emit Deposit(msg.sender, msg.value);
     }
 
-    function withdraw(uint wad) public {
+    function withdraw(uint wad) public override {
         require(balanceOf(msg.sender) >= wad, "WTM: not enough balance");
         _burn(msg.sender, wad);
         payable(msg.sender).transfer(wad);

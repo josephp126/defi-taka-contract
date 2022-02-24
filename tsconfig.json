@@ -12,6 +12,7 @@
     "resolveJsonModule": true,
     "composite": true
   },
-  "include": ["./hardhat.config.ts", "./test/"],
+  // "files": ["./hardhat.config.ts"],
+  "include": ["./hardhat.config.ts", "./scripts", "./test/", "./typechain-types"],
   "exclude": ["./dist", "./node_modules"]
 }

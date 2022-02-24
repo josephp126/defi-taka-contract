@@ -33,7 +33,7 @@ abstract contract RFQOrder is EIP712, AmountCalculator, Permitable {
 
     /// @notice Returns bitmask for double-spend invalidators based on lowest byte of order.info and filled quotes
     /// @return Result Each bit represents whether corresponding was already invalidated
-    function _invalidatorForOrderRFQ(address maker, uint256 slot) external view returns (uint256) {
+    function invalidatorForOrderRFQ(address maker, uint256 slot) external view returns (uint256) {
         return _invalidator[maker][slot];
     }
 
