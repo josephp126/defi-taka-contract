@@ -4,7 +4,7 @@ import { Address } from "cluster";
 import ethSigUtil from 'eth-sig-util';
 // import { fromRpcSig } from 'ethereumjs-util';
 
-const EIP712Domain = [
+export const EIP712Domain = [
     { name: 'name', type: 'string' },
     { name: 'version', type: 'string' },
     { name: 'chainId', type: 'uint256' },
@@ -19,7 +19,7 @@ const Permit = [
     { name: 'deadline', type: 'uint256' },
 ];
 
-function domainSeparator (name: String, version: String, chainId: any, verifyingContract: Address) {
+export function domainSeparator (name: String, version: String, chainId: any, verifyingContract: Address) {
     return '0x' + ethSigUtil.TypedDataUtils.hashStruct(
         'EIP712Domain',
         { name, version, chainId, verifyingContract },
@@ -27,7 +27,7 @@ function domainSeparator (name: String, version: String, chainId: any, verifying
     ).toString('hex');
 }
 
-function buildData (owner: Address, name: String, version: String, chainId: any, verifyingContract: Address, spender: Address, nonce: any, value: any, deadline: any) {
+export function buildData (owner: Address, name: String, version: String, chainId: any, verifyingContract: Address, spender: Address, nonce: any, value: any, deadline: any) {
     return {
         primaryType: 'Permit',
         types: { EIP712Domain, Permit },
@@ -35,4 +35,3 @@ function buildData (owner: Address, name: String, version: String, chainId: any,
         message: { owner, spender, value, nonce, deadline },
     };
 }
-

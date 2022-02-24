@@ -4,7 +4,9 @@ import { ethers } from "hardhat";
 
 import { bufferToHex } from 'ethereumjs-util';
 import ethSigUtil from 'eth-sig-util';
-const Wallet = require('ethereumjs-wallet').default;
+import Wallet from 'ethereumjs-wallet'
+
+import { buildOrderRFQData } from './helpers/orderUtils';
 
 describe("SmartTradingProtocol", async function () {
     let addr1:any, wallet: any;
@@ -33,6 +35,18 @@ describe("SmartTradingProtocol", async function () {
             expect(invalidator).to.be.bignumber.equal(toBN('1').shln(255));
         });
 
+        it('should not fill cancelled order', async function () {
+            const order = buildOrderRFQ('1', this.dai, this.weth, 1, 1);
+            const data = buildOrderRFQData(this.chainId, this.swap.address, order);
+            const signature = ethSigUtil.signTypedMessage(account.getPrivateKey(), { data });
+
+            await this.swap.cancelOrderRFQ('1', { from: wallet });
+
+            await expectRevert(
+                this.swap.fillOrderRFQ(order, signature, 1, 0),
+                'LOP: invalidated order',
+            );
+        });
        
     });
 
