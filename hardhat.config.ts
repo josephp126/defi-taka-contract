@@ -1,9 +1,12 @@
 import { task } from "hardhat/config";
 import "@nomiclabs/hardhat-waffle";
-// import chai from "chai";
-// import { solidity } from "ethereum-waffle";
+//added for using bignumber comparing start
+import chai from "chai";
+import { solidity } from "ethereum-waffle";
 
-// chai.use(solidity);
+chai.use(solidity);
+//added for using bignumber comparing end
+
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
 task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
