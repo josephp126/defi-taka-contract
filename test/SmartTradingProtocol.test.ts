@@ -82,12 +82,12 @@ describe("SmartTradingProtocol", async function () {
 
             await swap.connect(wallet).cancelOrderRFQ('1');
             
-            await expectRevert(
-                 swap.fillRFQOrder(order, signature, 1, 0),
-                'LOP: invalidated order',
-            );
+            // await expectRevert(
+            //      swap.fillRFQOrder(order, signature, 1, 0),
+            //     'LOP: invalidated order',
+            // );
 
-            // await expect(swap.fillRFQOrder(order, signature, 1, 0)).to.revertedWith('LOP: invalidated order');
+            await expect(swap.fillRFQOrder(order, signature, 1, 0)).to.revertedWith('LOP: invalidated order');
            
         });
     });
