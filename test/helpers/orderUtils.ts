@@ -1,3 +1,4 @@
+import { BigNumber } from 'ethers';
 import { EIP712Domain } from './eip712';
 
 export const OrderRFQ = [

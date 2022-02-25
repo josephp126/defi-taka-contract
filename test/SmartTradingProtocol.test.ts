@@ -1,7 +1,7 @@
 import { expectRevert, time, constants } from '@openzeppelin/test-helpers';
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Contract, Signer, BigNumber } from "ethers";
+import { Contract, Signer, BigNumber, Bytes, BytesLike } from "ethers";
 
 import {signTypedMessage} from 'eth-sig-util';
 import Wallet from 'ethereumjs-wallet'
@@ -16,15 +16,17 @@ describe("SmartTradingProtocol", async function () {
     let dai: TokenMock;
     let weth: WrappedTokenMock;
 
-    const privatekey = 'd7f6ba85816a785036f9fc52c7c2e7cbfa4cd2a6cf077d25e8a8f87a3e600c87';
+    // const privatekey = 'd7f6ba85816a785036f9fc52c7c2e7cbfa4cd2a6cf077d25e8a8f87a3e600c87';
+    //we must use this privatekey for this contract test;
+    const privatekey = '59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
     const account = Wallet.fromPrivateKey(Buffer.from(privatekey, 'hex'));
     
-    async function buildOrderRFQ (info: any, makerAsset: any, takerAsset: any, makingAmount: any, takingAmount: any, maker:any, allowedSender = constants.ZERO_ADDRESS) {
+    async function buildOrderRFQ (info: any, makerAsset: any, takerAsset: any, makingAmount: any, takingAmount: any, allowedSender = constants.ZERO_ADDRESS) {
         return {
             info,
             makerAsset: makerAsset.address,
             takerAsset: takerAsset.address,
-            maker: await maker.getAddress(),
+            maker: await wallet.getAddress(),
             allowedSender,
             makingAmount,
             takingAmount,
@@ -47,7 +49,7 @@ describe("SmartTradingProtocol", async function () {
         await dai.deployed();
         await weth.deployed();
         await swap.deployed();
-        this.chainId = await dai.getChainId();
+        this.chainId = await (await dai.getChainId()).toNumber();
 
         await dai.mint(await wallet.getAddress(), '1000000');
         await weth.mint(await wallet.getAddress(), '1000000');
@@ -74,18 +76,58 @@ describe("SmartTradingProtocol", async function () {
         });
 
         it('should not fill cancelled order', async function () {
-            const order = buildOrderRFQ('1', dai, weth, 1, 1, wallet);
-            const data = buildOrderRFQData(this.chainId, swap.address, await order);
+            const order = await buildOrderRFQ('1', dai, weth, 1, 1);
+            const data = buildOrderRFQData(this.chainId, swap.address, order);
             const signature = signTypedMessage(account.getPrivateKey(), {data});
 
             await swap.connect(wallet).cancelOrderRFQ('1');
-
+            
             await expectRevert(
-                swap.fillRFQOrder(await order, signature, 1, 0),
+                 swap.fillRFQOrder(order, signature, 1, 0),
                 'LOP: invalidated order',
             );
+
+            // await expect(swap.fillRFQOrder(order, signature, 1, 0)).to.revertedWith('LOP: invalidated order');
+           
         });
-       
+    });
+
+    describe('Expiration', async function () {
+        it('should partial fill RFQ order', async function () {
+            const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 2, 2);
+            const data = buildOrderRFQData(this.chainId, swap.address, order);
+            const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+            const makerDai = await dai.balanceOf(await wallet.getAddress());
+            const takerDai = await dai.balanceOf(await owner.getAddress());
+            const makerWeth = await weth.balanceOf(await wallet.getAddress());
+            const takerWeth = await weth.balanceOf(await owner.getAddress());
+
+            await swap.fillRFQOrder(order, signature, 1, 0);
+
+            expect(BigNumber.from(await dai.balanceOf(await wallet.getAddress()))).to.be.equal(BigNumber.from(makerDai).sub(1));
+            expect(BigNumber.from(await dai.balanceOf(await owner.getAddress()))).to.be.equal(BigNumber.from(takerDai).add(1));
+            expect(BigNumber.from(await weth.balanceOf(await wallet.getAddress()))).to.be.equal(BigNumber.from(makerWeth).add(1));
+            expect(BigNumber.from(await weth.balanceOf(await owner.getAddress()))).to.be.equal(BigNumber.from(takerWeth).sub(1));
+        });
+
+        it('should fully fill RFQ order', async function () {
+            const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 1, 1);
+            const data = buildOrderRFQData(this.chainId, swap.address, order);
+            const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+            const makerDai = await dai.balanceOf(await wallet.getAddress());
+            const takerDai = await dai.balanceOf(await owner.getAddress());
+            const makerWeth = await weth.balanceOf(await wallet.getAddress());
+            const takerWeth = await weth.balanceOf(await owner.getAddress());
+
+            await swap.fillRFQOrder(order, signature, 0, 0);
+
+            expect(BigNumber.from(await dai.balanceOf(await wallet.getAddress()))).to.be.equal(BigNumber.from(makerDai).sub(1));
+            expect(BigNumber.from(await dai.balanceOf(await owner.getAddress()))).to.be.equal(BigNumber.from(takerDai).add(1));
+            expect(BigNumber.from(await weth.balanceOf(await wallet.getAddress()))).to.be.equal(BigNumber.from(makerWeth).add(1));
+            expect(BigNumber.from(await weth.balanceOf(await owner.getAddress()))).to.be.equal(BigNumber.from(takerWeth).sub(1));
+        });
     });
 
 

@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "hardhat/console.sol";
 
 import "./utils/AmountCalculator.sol";
 import "./libraries/Permitable.sol";
@@ -47,7 +48,7 @@ abstract contract RFQOrder is EIP712, AmountCalculator, Permitable {
         uint256 invalidatorBit = 1 << uint8(orderInfo);
         mapping(uint256 => uint256) storage invalidatorStorage = _invalidator[maker];
         uint256 invalidator = invalidatorStorage[invalidatorSlot];
-        require(invalidator & invalidatorBit == 0, "LOP: invalidator order");
+        require(invalidator & invalidatorBit == 0, "LOP: invalidated order");
         invalidatorStorage[invalidatorSlot] = invalidator | invalidatorBit;
     }
 
@@ -103,7 +104,7 @@ abstract contract RFQOrder is EIP712, AmountCalculator, Permitable {
         require(target != address(0), "LOP: zero target is forbidden");
 
         address maker = order.maker;
-        
+
         //validate order
         require(order.allowedSender == address(0) || order.allowedSender == msg.sender, "LOP: private order");
         bytes32 orderHash = _hashTypedDataV4(keccak256(abi.encode(LIMIT_ORDER_RFQ_TYPEHASH, order)));
