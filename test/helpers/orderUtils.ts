@@ -10,14 +10,35 @@ export const OrderRFQ = [
     { name: 'takingAmount', type: 'uint256' },
 ];
 
-export const nameProtocol = 'TakaDAO Smart Trading Protocol';
-export const version = '1';
+export const name:string = 'TakaDAO Smart Trading Protocol';
+export const version:string = '1';
 
-export function buildOrderRFQData (chainId:any, verifyingContract:any, order:any) {
+
+interface MessageTypeProperty {
+    name: string;
+    type: string;
+}
+interface MessageTypes {
+    EIP712Domain: MessageTypeProperty[];
+    [additionalProperties: string]: MessageTypeProperty[];
+}
+export interface TypedMessage<T extends MessageTypes> {
+    types: T;
+    primaryType: keyof T;
+    domain: {
+        name?: string;
+        version?: string;
+        chainId?: number;
+        verifyingContract?: string;
+    };
+    message: Record<string, unknown>;
+}
+
+export function buildOrderRFQData (chainId:number, verifyingContract:string, order:Record<string, unknown>): TypedMessage<MessageTypes> {
     return {
         primaryType: 'OrderRFQ',
         types: { EIP712Domain, OrderRFQ },
-        domain: { nameProtocol, version, chainId, verifyingContract },
+        domain: { name, version, chainId, verifyingContract },
         message: order,
     };
 }
