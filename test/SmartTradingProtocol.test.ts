@@ -16,7 +16,7 @@ describe("SmartTradingProtocol", async function () {
     let dai: TokenMock;
     let weth: WrappedTokenMock;
 
-    const privatekey = '59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
+    const privatekey = 'd7f6ba85816a785036f9fc52c7c2e7cbfa4cd2a6cf077d25e8a8f87a3e600c87';
     const account = Wallet.fromPrivateKey(Buffer.from(privatekey, 'hex'));
     
     async function buildOrderRFQ (info: any, makerAsset: any, takerAsset: any, makingAmount: any, takingAmount: any, maker:any, allowedSender = constants.ZERO_ADDRESS) {
