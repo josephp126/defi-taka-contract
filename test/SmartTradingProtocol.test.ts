@@ -155,5 +155,14 @@ describe("SmartTradingProtocol", async function () {
 
             await expect(swap.fillRFQOrder(order, signature, 1, 0)).to.revertedWith('LOP: order expired');
         });
+
+        it('should not partial fill RFQ order when 0', async function () {
+            const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 5, 10);
+            const data = buildOrderRFQData(this.chainId, swap.address, order);
+            const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+            await expect(swap.fillRFQOrder(order, signature, 0, 1)).to.revertedWith('LOP: can\'t swap 0 amount');
+        });
+
     });
 })
