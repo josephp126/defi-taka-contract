@@ -7,6 +7,8 @@ import {signTypedMessage} from 'eth-sig-util';
 import Wallet from 'ethereumjs-wallet'
 import { SmartTradingProtocol, TokenMock, WrappedTokenMock} from '../typechain-types'
 import { buildOrderRFQData } from './helpers/orderUtils';
+import {ownerPrivateKey} from './helpers/utils';
+import {getPermit} from './helpers/eip712'
 
 describe("SmartTradingProtocol", async function () {
     let owner:Signer;
@@ -49,7 +51,7 @@ describe("SmartTradingProtocol", async function () {
         await dai.deployed();
         await weth.deployed();
         await swap.deployed();
-        this.chainId = await (await dai.getChainId()).toNumber();
+        this.chainId = (await dai.getChainId()).toNumber();
 
         await dai.mint(await wallet.getAddress(), '1000000');
         await weth.mint(await wallet.getAddress(), '1000000');
@@ -81,12 +83,6 @@ describe("SmartTradingProtocol", async function () {
             const signature = signTypedMessage(account.getPrivateKey(), {data});
 
             await swap.connect(wallet).cancelOrderRFQ('1');
-            
-            // await expectRevert(
-            //      swap.fillRFQOrder(order, signature, 1, 0),
-            //     'LOP: invalidated order',
-            // );
-
             await expect(swap.fillRFQOrder(order, signature, 1, 0)).to.revertedWith('LOP: invalidated order');
            
         });
@@ -163,6 +159,37 @@ describe("SmartTradingProtocol", async function () {
 
             await expect(swap.fillRFQOrder(order, signature, 0, 1)).to.revertedWith('LOP: can\'t swap 0 amount');
         });
-
+        
     });
+
+    describe('Permit', function () {
+        describe('fillOrderRFQToWithPermit', function () {
+            it('DAI => WETH', async function () {
+                // await dai.connect(account.getAddressString()).approve(swap.address, '1000000');
+                await dai.connect(wallet).approve(swap.address, '1000000');
+                const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 1, 1);
+                const data = buildOrderRFQData(this.chainId, swap.address, order);
+                const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+                const permit :any= await getPermit(owner, ownerPrivateKey, weth, '1', this.chainId, swap.address, '1');
+                console.log('permit', permit);
+                const makerDai = await dai.balanceOf(await wallet.getAddress());
+                const takerDai = await dai.balanceOf(await owner.getAddress());
+                const makerWeth = await weth.balanceOf(await wallet.getAddress());
+                const takerWeth = await weth.balanceOf(await owner.getAddress());
+                // const allowance = await weth.allowance(account.getAddressString(), swap.address);
+                const allowance = await weth.allowance(await wallet.getAddress(), swap.address);
+                await swap.fillRFQOrderToWithPermit(order, signature, 1, 0, await owner.getAddress(), permit);
+
+                expect(BigNumber.from(await dai.balanceOf(await wallet.getAddress()))).to.equal(BigNumber.from(makerDai).sub(1));
+                expect(BigNumber.from(await dai.balanceOf(await owner.getAddress()))).to.equal(BigNumber.from(takerDai).add(1));
+                expect(BigNumber.from(await weth.balanceOf(await wallet.getAddress()))).to.equal(BigNumber.from(makerWeth).add(1));
+                expect(BigNumber.from(await weth.balanceOf(await owner.getAddress()))).to.equal(BigNumber.from(takerWeth).sub(1));
+                // expect(BigNumber.from(allowance)).to.eq(BigNumber.from('0'));
+                expect(BigNumber.from(allowance)).to.eq(BigNumber.from('1000000'));
+            });
+        })
+    });
+
+
 })
