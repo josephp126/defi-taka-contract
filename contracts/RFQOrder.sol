@@ -114,6 +114,8 @@ abstract contract RFQOrder is EIP712, AmountCalculator, Permitable {
             uint256 info = order.info;
             // Check time expiration
             uint256 expiration = uint128(info) >> 64;
+            console.log('expiration', expiration);
+            console.log('timestamp', block.timestamp);
             require(expiration == 0 || block.timestamp <= expiration, "LOP: order expired");
             _invalidateOrder(maker, info);
         }

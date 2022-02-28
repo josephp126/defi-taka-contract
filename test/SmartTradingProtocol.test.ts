@@ -147,7 +147,13 @@ describe("SmartTradingProtocol", async function () {
             expect(BigNumber.from(await weth.balanceOf(await wallet.getAddress()))).to.be.equal(BigNumber.from(makerWeth).add(1));
             expect(BigNumber.from(await weth.balanceOf(await owner.getAddress()))).to.be.equal(BigNumber.from(takerWeth).sub(1));
         });
+
+        it('should not fill RFQ order when expired', async function () {
+            const order = await buildOrderRFQ('308276084001730439550074881', dai, weth, 1, 1);
+            const data = buildOrderRFQData(this.chainId, swap.address, order);
+            const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+            await expect(swap.fillRFQOrder(order, signature, 1, 0)).to.revertedWith('LOP: order expired');
+        });
     });
-
-
 })
