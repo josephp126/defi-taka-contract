@@ -93,6 +93,25 @@ describe("SmartTradingProtocol", async function () {
     });
 
     describe('Expiration', async function () {
+
+        it('should fill RFQ order when not expired', async function () {
+            const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 1, 1);
+            const data = buildOrderRFQData(this.chainId, swap.address, order);
+            const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+            const makerDai = await dai.balanceOf(await wallet.getAddress());
+            const takerDai = await dai.balanceOf(await owner.getAddress());
+            const makerWeth = await weth.balanceOf(await wallet.getAddress());
+            const takerWeth = await weth.balanceOf(await owner.getAddress());
+
+            await swap.fillRFQOrder(order, signature, 1, 0);
+
+            expect(BigNumber.from(await dai.balanceOf(await wallet.getAddress()))).to.equal(BigNumber.from(makerDai).sub(1));
+            expect(BigNumber.from(await dai.balanceOf(await owner.getAddress()))).to.equal(BigNumber.from(takerDai).add(1));
+            expect(BigNumber.from(await weth.balanceOf(await wallet.getAddress()))).to.equal(BigNumber.from(makerWeth).add(1));
+            expect(BigNumber.from(await weth.balanceOf(await owner.getAddress()))).to.equal(BigNumber.from(takerWeth).sub(1));
+        });
+
         it('should partial fill RFQ order', async function () {
             const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 2, 2);
             const data = buildOrderRFQData(this.chainId, swap.address, order);
