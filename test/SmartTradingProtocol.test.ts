@@ -1,7 +1,7 @@
 import { expectRevert, time, constants } from '@openzeppelin/test-helpers';
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Contract, Signer, BigNumber, Bytes, BytesLike } from "ethers";
+import { Signer, BigNumber } from "ethers";
 
 import {signTypedMessage} from 'eth-sig-util';
 import Wallet from 'ethereumjs-wallet'
@@ -201,7 +201,7 @@ describe("SmartTradingProtocol", async function () {
             });
 
             it('rejects other signature', async function () {
-                // await this.dai.approve(swap.address, '1000000', { from: account.getAddressString() });
+                // await dai.approve(swap.address, '1000000', { from: account.getAddressString() });
                 dai.approve(swap.address, '1000000');
                 const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 1, 1);
                 const data = buildOrderRFQData(this.chainId, swap.address, order);
@@ -210,6 +210,18 @@ describe("SmartTradingProtocol", async function () {
                 const otherWallet = Wallet.generate();
                 const permit = await getPermit(owner, otherWallet.getPrivateKey(), weth, '1', this.chainId, swap.address, '1');
                 await expect( swap.fillRFQOrderToWithPermit(order, signature, 0, 1, await owner.getAddress(), permit)).to.revertedWith('ERC20Permit: invalid signature');
+            });
+
+            it('rejects expired permit', async function () {
+                const latestBlock = await ethers.provider.getBlock("latest")
+                const deadline = latestBlock.timestamp - time.duration.weeks(1);
+                console.log('deadline', deadline);
+                const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 1, 1);
+                const data = buildOrderRFQData(this.chainId, swap.address, order);
+                const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+                const permit = await getPermit(owner, ownerPrivateKey, weth, '1', this.chainId, swap.address, '1', deadline.toString());
+                await expect(swap.fillRFQOrderToWithPermit(order, signature, 0, 1, await owner.getAddress(), permit)).to.revertedWith('expired deadline');
             });
 
         })
