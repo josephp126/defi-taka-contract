@@ -8,7 +8,7 @@ import { solidity } from "ethereum-waffle";
 
 chai.use(solidity);
 //added for using bignumber comparing end
-
+import { networks }  from './hardhat.network';
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
 task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
@@ -26,5 +26,14 @@ task("accounts", "Prints the list of accounts", async (taskArgs, hre) => {
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
-  solidity: "0.8.4",
+  solidity: {
+    version: "0.8.4",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 1000000,
+      }
+    }
+  },
+  networks: networks,
 };

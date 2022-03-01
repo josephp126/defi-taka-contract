@@ -9,6 +9,7 @@ import { SmartTradingProtocol, TokenMock, WrappedTokenMock } from '../typechain-
 import { buildOrderRFQData } from './helpers/orderUtils';
 import { ownerPrivateKey } from './helpers/utils';
 import { getPermit } from './helpers/eip712'
+import {profileEVM, gasspectEVM} from './helpers/profileEVM'
 
 describe("SmartTradingProtocol", async function () {
     let owner: Signer;
@@ -251,7 +252,12 @@ describe("SmartTradingProtocol", async function () {
 
                 const receipt = await swap.fillRFQOrder(order, signature, 1, 0);
 
-                
+                expect(
+                    await profileEVM(receipt.hash, ['CALL', 'STATICCALL', 'SSTORE', 'SLOAD', 'EXTCODESIZE']),
+                ).to.be.deep.equal([2, 1, 7, 7, 2]);
+
+                await gasspectEVM(receipt.hash);
+
                 expect(BigNumber.from(await dai.balanceOf(await wallet.getAddress()))).to.equal(BigNumber.from(makerDai).sub(1));
                 expect(BigNumber.from(await dai.balanceOf(await owner.getAddress()))).to.equal(BigNumber.from(takerDai).add(1));
                 expect(BigNumber.from(await weth.balanceOf(await wallet.getAddress()))).to.equal(BigNumber.from(makerWeth).add(1));

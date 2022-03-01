@@ -13,6 +13,6 @@
     "composite": true
   },
   // "files": ["./hardhat.config.ts"],
-  "include": ["./hardhat.config.ts", "./scripts", "./test/", "./typechain-types"],
+  "include": ["./hardhat.config.ts", "./scripts", "./test/", "./typechain-types","./hardhat.network.ts"],
   "exclude": ["./dist", "./node_modules"]
 }
