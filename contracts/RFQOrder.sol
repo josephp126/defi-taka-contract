@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "hardhat/console.sol";
 
-import "./utils/AmountCalculator.sol";
+import "./helpers/AmountCalculator.sol";
 import "./libraries/Permitable.sol";
 
 /// @title RFQ Limit Order
