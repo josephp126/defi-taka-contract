@@ -172,7 +172,6 @@ describe("SmartTradingProtocol", async function () {
                 const signature = signTypedMessage(account.getPrivateKey(), { data });
 
                 const permit :any= await getPermit(owner, ownerPrivateKey, weth, '1', this.chainId, swap.address, '1');
-                console.log('permit', permit);
                 const makerDai = await dai.balanceOf(await wallet.getAddress());
                 const takerDai = await dai.balanceOf(await owner.getAddress());
                 const makerWeth = await weth.balanceOf(await wallet.getAddress());
@@ -187,6 +186,18 @@ describe("SmartTradingProtocol", async function () {
                 expect(BigNumber.from(await weth.balanceOf(await owner.getAddress()))).to.equal(BigNumber.from(takerWeth).sub(1));
                 // expect(BigNumber.from(allowance)).to.eq(BigNumber.from('0'));
                 expect(BigNumber.from(allowance)).to.eq(BigNumber.from('1000000'));
+            });
+
+            it('rejects reused signature', async function () {
+                // await dai.approve(swap.address, '1000000', { from: account.getAddressString() });
+                await dai.connect(wallet).approve(swap.address, '1000000');
+                const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 1, 1);
+                const data = buildOrderRFQData(this.chainId, swap.address, order);
+                const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+                const permit = await getPermit(owner, ownerPrivateKey, weth, '1', this.chainId, swap.address, '1');
+                await swap.fillRFQOrderToWithPermit(order, signature, 0, 1, await owner.getAddress(), permit);
+                await expect(swap.fillRFQOrderToWithPermit(order, signature, 0, 1, await owner.getAddress(), permit)).to.revertedWith('ERC20Permit: invalid signature');
             });
         })
     });

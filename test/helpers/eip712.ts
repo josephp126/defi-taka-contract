@@ -74,7 +74,6 @@ export async function getPermit (owner: any, ownerPrivateKey: any, token: any, t
     const { v, r, s } = fromRpcSig(signature);
     // const permitCall = await permitContract.permit(await owner.getAddress(), spender, value, BigNumber.from(deadline), v, r, s);
 
-    // console.log('permitcall',permitCall);
     let iface = new ethers.utils.Interface([
         "function permit(address,address,uint256,uint256,uint8,bytes32,bytes32)"
     ]);
@@ -87,7 +86,6 @@ export async function getPermit (owner: any, ownerPrivateKey: any, token: any, t
          r, 
          s
     ]);
-    console.log('permitdata', permitdata);
     return cutSelector(permitdata);
     // return cutSelector(permitCall);
 }
