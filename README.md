@@ -58,7 +58,7 @@ Extremely **_flexible_** limit order, can be configured with:
 
 In the project directory, you can run:
 
-`npm start`
+`npm test`
 
 Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Open [http://localhost:8545](http://localhost:8545) to view it in your browser.
