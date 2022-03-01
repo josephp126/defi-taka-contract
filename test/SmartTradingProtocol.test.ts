@@ -199,6 +199,20 @@ describe("SmartTradingProtocol", async function () {
                 await swap.fillRFQOrderToWithPermit(order, signature, 0, 1, await owner.getAddress(), permit);
                 await expect(swap.fillRFQOrderToWithPermit(order, signature, 0, 1, await owner.getAddress(), permit)).to.revertedWith('ERC20Permit: invalid signature');
             });
+
+            it('rejects other signature', async function () {
+                // await this.dai.approve(swap.address, '1000000', { from: account.getAddressString() });
+                dai.approve(swap.address, '1000000');
+                const order = await buildOrderRFQ('20203181441137406086353707335681', dai, weth, 1, 1);
+                const data = buildOrderRFQData(this.chainId, swap.address, order);
+                const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+                const otherWallet = Wallet.generate();
+                const permit = await getPermit(owner, otherWallet.getPrivateKey(), weth, '1', this.chainId, swap.address, '1');
+                const  requestFunc = async () => swap.fillRFQOrderToWithPermit(order, signature, 0, 1, await owner.getAddress(), permit);
+                await expect(requestFunc).to.revertedWith('ERC20Permit: invalid signature');
+            });
+
         })
     });
 
