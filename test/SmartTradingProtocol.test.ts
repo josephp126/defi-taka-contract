@@ -3,16 +3,16 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Signer, BigNumber } from "ethers";
 
-import {signTypedMessage} from 'eth-sig-util';
+import { signTypedMessage } from 'eth-sig-util';
 import Wallet from 'ethereumjs-wallet'
-import { SmartTradingProtocol, TokenMock, WrappedTokenMock} from '../typechain-types'
+import { SmartTradingProtocol, TokenMock, WrappedTokenMock } from '../typechain-types'
 import { buildOrderRFQData } from './helpers/orderUtils';
-import {ownerPrivateKey} from './helpers/utils';
-import {getPermit} from './helpers/eip712'
+import { ownerPrivateKey } from './helpers/utils';
+import { getPermit } from './helpers/eip712'
 
 describe("SmartTradingProtocol", async function () {
-    let owner:Signer;
-    let  wallet: Signer;
+    let owner: Signer;
+    let wallet: Signer;
     let accounts: Signer[];
     let swap: SmartTradingProtocol;
     let dai: TokenMock;
@@ -22,8 +22,8 @@ describe("SmartTradingProtocol", async function () {
     //we must use this privatekey for this contract test;
     const privatekey = '59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
     const account = Wallet.fromPrivateKey(Buffer.from(privatekey, 'hex'));
-    
-    async function buildOrderRFQ (info: any, makerAsset: any, takerAsset: any, makingAmount: any, takingAmount: any, allowedSender = constants.ZERO_ADDRESS) {
+
+    async function buildOrderRFQ(info: any, makerAsset: any, takerAsset: any, makingAmount: any, takingAmount: any, allowedSender = constants.ZERO_ADDRESS) {
         return {
             info,
             makerAsset: makerAsset.address,
@@ -63,7 +63,7 @@ describe("SmartTradingProtocol", async function () {
         await dai.connect(wallet).approve(swap.address, '1000000');
         await weth.connect(wallet).approve(swap.address, '1000000');
     });
-    
+
     describe('OrderRFQ Cancelation', async function () {
         it('should cancel own order', async function () {
             await swap.cancelOrderRFQ('1');
@@ -80,11 +80,11 @@ describe("SmartTradingProtocol", async function () {
         it('should not fill cancelled order', async function () {
             const order = await buildOrderRFQ('1', dai, weth, 1, 1);
             const data = buildOrderRFQData(this.chainId, swap.address, order);
-            const signature = signTypedMessage(account.getPrivateKey(), {data});
+            const signature = signTypedMessage(account.getPrivateKey(), { data });
 
             await swap.connect(wallet).cancelOrderRFQ('1');
             await expect(swap.fillRFQOrder(order, signature, 1, 0)).to.revertedWith('LOP: invalidated order');
-           
+
         });
     });
 
@@ -159,7 +159,7 @@ describe("SmartTradingProtocol", async function () {
 
             await expect(swap.fillRFQOrder(order, signature, 0, 1)).to.revertedWith('LOP: can\'t swap 0 amount');
         });
-        
+
     });
 
     describe('Permit', function () {
@@ -171,7 +171,7 @@ describe("SmartTradingProtocol", async function () {
                 const data = buildOrderRFQData(this.chainId, swap.address, order);
                 const signature = signTypedMessage(account.getPrivateKey(), { data });
 
-                const permit :any= await getPermit(owner, ownerPrivateKey, weth, '1', this.chainId, swap.address, '1');
+                const permit: any = await getPermit(owner, ownerPrivateKey, weth, '1', this.chainId, swap.address, '1');
                 const makerDai = await dai.balanceOf(await wallet.getAddress());
                 const takerDai = await dai.balanceOf(await owner.getAddress());
                 const makerWeth = await weth.balanceOf(await wallet.getAddress());
@@ -209,7 +209,7 @@ describe("SmartTradingProtocol", async function () {
 
                 const otherWallet = Wallet.generate();
                 const permit = await getPermit(owner, otherWallet.getPrivateKey(), weth, '1', this.chainId, swap.address, '1');
-                await expect( swap.fillRFQOrderToWithPermit(order, signature, 0, 1, await owner.getAddress(), permit)).to.revertedWith('ERC20Permit: invalid signature');
+                await expect(swap.fillRFQOrderToWithPermit(order, signature, 0, 1, await owner.getAddress(), permit)).to.revertedWith('ERC20Permit: invalid signature');
             });
 
             it('rejects expired permit', async function () {
@@ -227,5 +227,38 @@ describe("SmartTradingProtocol", async function () {
         })
     });
 
+    describe('wip', async function () {
+        it('transferFrom', async function () {
+            await dai.connect(wallet).approve(await owner.getAddress(), '2');
+            await dai.connect(owner).transferFrom(await wallet.getAddress(), await owner.getAddress(), '1');
+        });
+
+
+
+        it('should swap fully based on RFQ signature', async function () {
+            // Order: 1 DAI => 1 WETH
+            // Swap:  1 DAI => 1 WETH
+
+            for (const salt of ['000000000000000000000001', '000000000000000000000002']) {
+                const order = await buildOrderRFQ(salt, dai, weth, 1, 1);
+                const data = buildOrderRFQData(this.chainId, swap.address, order);
+                const signature = signTypedMessage(account.getPrivateKey(), { data });
+
+                const makerDai = await dai.balanceOf(await wallet.getAddress());
+                const takerDai = await dai.balanceOf(await owner.getAddress());
+                const makerWeth = await weth.balanceOf(await wallet.getAddress());
+                const takerWeth = await weth.balanceOf(await owner.getAddress());
+
+                const receipt = await swap.fillRFQOrder(order, signature, 1, 0);
+
+                
+                expect(BigNumber.from(await dai.balanceOf(await wallet.getAddress()))).to.equal(BigNumber.from(makerDai).sub(1));
+                expect(BigNumber.from(await dai.balanceOf(await owner.getAddress()))).to.equal(BigNumber.from(takerDai).add(1));
+                expect(BigNumber.from(await weth.balanceOf(await wallet.getAddress()))).to.equal(BigNumber.from(makerWeth).add(1));
+                expect(BigNumber.from(await weth.balanceOf(await owner.getAddress()))).to.equal(BigNumber.from(takerWeth).sub(1));
+            }
+        });
+
+    });
 
 })
