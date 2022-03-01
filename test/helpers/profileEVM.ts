@@ -31,7 +31,6 @@ export async function profileEVM(txHash: any, instruction: any) {
             // disableStorage: true,
         },
     ]);
-    console.log(trace);
     const str = JSON.stringify(trace);
 
     if (Array.isArray(instruction)) {

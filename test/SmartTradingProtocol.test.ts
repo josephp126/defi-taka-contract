@@ -6,10 +6,10 @@ import { Signer, BigNumber } from "ethers";
 import { signTypedMessage } from 'eth-sig-util';
 import Wallet from 'ethereumjs-wallet'
 import { SmartTradingProtocol, TokenMock, WrappedTokenMock } from '../typechain-types'
-import { buildOrderRFQData } from './helpers/orderUtils';
+import { buildOrderRFQData, name, version } from './helpers/orderUtils';
 import { ownerPrivateKey } from './helpers/utils';
-import { getPermit } from './helpers/eip712'
-import {profileEVM, gasspectEVM} from './helpers/profileEVM'
+import { getPermit, domainSeparator } from './helpers/eip712'
+import { profileEVM, gasspectEVM } from './helpers/profileEVM'
 
 describe("SmartTradingProtocol", async function () {
     let owner: Signer;
@@ -63,6 +63,20 @@ describe("SmartTradingProtocol", async function () {
         await weth.approve(swap.address, '1000000');
         await dai.connect(wallet).approve(swap.address, '1000000');
         await weth.connect(wallet).approve(swap.address, '1000000');
+    });
+    describe('Eip712', async function () {
+        
+        // We get the chain id from the contract because Ganache (used for coverage) does not return the same chain id
+        // from within the EVM as from the JSON RPC interface.
+        // See https://github.com/trufflesuite/ganache-core/issues/515
+
+        it('domain separator', async function () {
+            expect(
+                await swap.DOMAIN_SEPARATOR(),
+            ).to.equal(
+                domainSeparator(name, version, this.chainId, swap.address),
+            );
+        });
     });
 
     describe('OrderRFQ Cancelation', async function () {
