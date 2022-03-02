@@ -7,11 +7,13 @@ import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./helpers/AmountCalculator.sol";
+import "./libraries/ArgumentsDecoder.sol";
 import "./libraries/Permitable.sol";
 
 /// @title Regular Limit Order
 abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
     using Address for address;
+    using ArgumentsDecoder for bytes;
 
     /// @notice Emitted every time order gets filled, including partial fills
     event OrderFilled(
@@ -124,5 +126,42 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
                 )
             )
         );
+    }
+
+    /// @notice Same as `fillOrder` but allows to specify funds destination instead of `msg.sender`
+    /// @param order Order quote to fill
+    /// @param signature Signature to confirm quote ownership
+    /// @param makingAmount Making amount
+    /// @param takingAmount Taking amount
+    /// @param thresholdAmount Specifies maximum allowed takingAmount when takingAmount is zero, otherwise specifies minimum allowed makingAmount
+    /// @param target Address that will receive swap funds
+    function fillOrderTo(
+        Order memory order,
+        bytes calldata signature,
+        uint256 makingAmount,
+        uint256 takingAmount,
+        uint256 thresholdAmount,
+        address target
+    ) public returns(uint256 /* actualMakingAmount */, uint256 /* actualTakingAmount */) {
+        require(target != address(0), "LOP: zero target is forbidden");
+        bytes32 orderHash = hashOrder(order);
+
+        uint256 remainingMakerAmount = _remaining[orderHash];
+        require(remainingMakerAmount != _ORDER_FILLED, "LOP: remaining amount is 0");
+        require(order.allowedSender == address(0) || order.allowedSender == msg.sender, "LOP: private order");
+        if (remainingMakerAmount == _ORDER_DOES_NOT_EXIST) {
+            // First fill: validate order and permit maker asset
+            require(SignatureChecker.isValidSignatureNow(order.maker, orderHash, signature), "LOP: bad signature");
+            remainingMakerAmount = order.makingAmount;
+            if (order.permit.length >= 20) {
+                // proceed only if permit length is enough to store address
+                (address token, bytes memory permit) = order.permit.decodeTargetAndCalldata();
+                _permitMemory(token, permit);
+                require(_remaining[orderHash] == _ORDER_DOES_NOT_EXIST, "LOP: reentrancy detected");
+            }
+        } else {
+            unchecked { remainingMakerAmount -= 1; }
+        }
+
     }
 }
