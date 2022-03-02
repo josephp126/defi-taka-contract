@@ -68,6 +68,21 @@ abstract contract LimitOrder is
     uint256 constant private _ORDER_DOES_NOT_EXIST = 0;
     uint256 constant private _ORDER_FILLED = 1;
 
+    /// @notice Stores unfilled amounts for each order plus one.
+    /// Therefore 0 means order doesn't exist and 1 means order was filled
+    mapping(bytes32 => uint256) private _remaining;
 
+    /// @notice Returns unfilled amount for order. Throws if order does not exist
+    function remaining(bytes32 orderHash) external view returns(uint256) {
+        uint256 amount = _remaining[orderHash];
+        require(amount != _ORDER_DOES_NOT_EXIST, "LOP: Unknown order");
+        unchecked { amount -= 1; }
+        return amount;
+    }
 
+    /// @notice Returns unfilled amount for order
+    /// @return Result Unfilled amount of order plus one if order exists. Otherwise 0
+    function remainingRaw(bytes32 orderHash) external view returns(uint256) {
+        return _remaining[orderHash];
+    }
 }
