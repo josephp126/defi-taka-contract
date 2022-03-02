@@ -17,4 +17,20 @@ abstract contract LimitOrder is
 {
     using Address for address;
 
+    /// @notice Emitted every time order gets filled, including partial fills
+    event OrderFilled(
+        address indexed maker,
+        bytes32 orderHash,
+        uint256 remaining
+    );
+
+    /// @notice Emitted when order gets cancelled
+    event OrderCancelled(
+        address indexed maker,
+        bytes32 orderHash,
+        uint256 remainingRaw
+    );
+
+    
+
 }
