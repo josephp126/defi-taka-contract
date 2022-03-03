@@ -194,7 +194,12 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
 
         require(makingAmount > 0 && takingAmount > 0, "LOP: can't swap 0 amount");
 
-
+        // Update remaining amount in storage
+        unchecked {
+            remainingMakerAmount = remainingMakerAmount - makingAmount;
+            _remaining[orderHash] = remainingMakerAmount + 1;
+        }
+        emit OrderFilled(msg.sender, orderHash, remainingMakerAmount);
     }
 
     /// @notice Checks order predicate
