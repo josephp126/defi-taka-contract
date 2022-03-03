@@ -168,6 +168,32 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
             require(checkPredicate(order), "LOP: predicate returned false");
         }
 
+        // Compute maker and taker assets amount
+        if (takingAmount == 0 && makingAmount == 0) {
+            revert("LOP: only one amount should be 0");
+        } else if (takingAmount == 0) {
+            uint256 requestedMakingAmount = makingAmount;
+            if (makingAmount > remainingMakerAmount) {
+                makingAmount = remainingMakerAmount;
+            }
+            takingAmount = _callGetter(order.getTakerAmount, order.makingAmount, makingAmount, order.takingAmount);
+            // check that actual rate is not worse than what was expected
+            // takingAmount / makingAmount <= thresholdAmount / requestedMakingAmount
+            require(takingAmount * requestedMakingAmount <= thresholdAmount * makingAmount, "LOP: taking amount too high");
+        } else {
+            uint256 requestedTakingAmount = takingAmount;
+            makingAmount = _callGetter(order.getMakerAmount, order.takingAmount, takingAmount, order.makingAmount);
+            if (makingAmount > remainingMakerAmount) {
+                makingAmount = remainingMakerAmount;
+                takingAmount = _callGetter(order.getTakerAmount, order.makingAmount, makingAmount, order.takingAmount);
+            }
+            // check that actual rate is not worse than what was expected
+            // makingAmount / takingAmount >= thresholdAmount / requestedTakingAmount
+            require(makingAmount * requestedTakingAmount >= thresholdAmount * takingAmount, "LOP: making amount too low");
+        }
+
+        require(makingAmount > 0 && takingAmount > 0, "LOP: can't swap 0 amount");
+
 
     }
 
@@ -176,5 +202,17 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
         bytes memory result = address(this).functionStaticCall(order.predicate, "LOP: predicate call failed");
         require(result.length == 32, "LOP: invalid predicate return");
         return result.decodeBool();
+    }
+
+    function _callGetter(bytes memory getter, uint256 orderExpectedAmount, uint256 amount, uint256 orderResultAmount) private view returns(uint256) {
+        if (getter.length == 0) {
+            // On empty getter calldata only exact amount is allowed
+            require(amount == orderExpectedAmount, "LOP: wrong amount");
+            return orderResultAmount;
+        } else {
+            bytes memory result = address(this).functionStaticCall(abi.encodePacked(getter, amount), "LOP: getAmount call failed");
+            require(result.length == 32, "LOP: invalid getAmount return");
+            return result.decodeUint256();
+        }
     }
 }

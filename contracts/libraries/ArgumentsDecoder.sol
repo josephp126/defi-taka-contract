@@ -23,4 +23,12 @@ library ArgumentsDecoder {
         return value;
     }
 
+    function decodeUint256(bytes memory data) internal pure returns(uint256) {
+        uint256 value;
+        assembly { // solhint-disable-line no-inline-assembly
+            value := mload(add(data, 0x20))
+        }
+        return value;
+    }
+
 }
