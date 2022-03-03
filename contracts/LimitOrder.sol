@@ -129,6 +129,22 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
         );
     }
 
+    /// @notice Fills an order. If one doesn't exist (first fill) it will be created using order.makerAssetData
+    /// @param order Order quote to fill
+    /// @param signature Signature to confirm quote ownership
+    /// @param makingAmount Making amount
+    /// @param takingAmount Taking amount
+    /// @param thresholdAmount Specifies maximum allowed takingAmount when takingAmount is zero, otherwise specifies minimum allowed makingAmount
+    function fillOrder(
+        Order memory order,
+        bytes calldata signature,
+        uint256 makingAmount,
+        uint256 takingAmount,
+        uint256 thresholdAmount
+    ) external returns(uint256 /* actualMakingAmount */, uint256 /* actualTakingAmount */) {
+        return fillOrderTo(order, signature, makingAmount, takingAmount, thresholdAmount, msg.sender);
+    }
+    
     /// @notice Same as `fillOrder` but allows to specify funds destination instead of `msg.sender`
     /// @param order Order quote to fill
     /// @param signature Signature to confirm quote ownership
@@ -203,7 +219,7 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
             }
             emit OrderFilled(msg.sender, orderHash, remainingMakerAmount);
         }
-        
+
         // Taker => Maker
         _makeCall(
             order.takerAsset,
