@@ -200,6 +200,32 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
             _remaining[orderHash] = remainingMakerAmount + 1;
         }
         emit OrderFilled(msg.sender, orderHash, remainingMakerAmount);
+
+        // Taker => Maker
+        _makeCall(
+            order.takerAsset,
+            abi.encodePacked(
+                IERC20.transferFrom.selector,
+                uint256(uint160(msg.sender)),
+                uint256(uint160(order.receiver == address(0) ? order.maker : order.receiver)),
+                takingAmount,
+                order.takerAssetData
+            )
+        );
+
+        // Maker => Taker
+        _makeCall(
+            order.makerAsset,
+            abi.encodePacked(
+                IERC20.transferFrom.selector,
+                uint256(uint160(order.maker)),
+                uint256(uint160(target)),
+                makingAmount,
+                order.makerAssetData
+            )
+        );
+
+        return (makingAmount, takingAmount);
     }
 
     /// @notice Checks order predicate
@@ -218,6 +244,13 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
             bytes memory result = address(this).functionStaticCall(abi.encodePacked(getter, amount), "LOP: getAmount call failed");
             require(result.length == 32, "LOP: invalid getAmount return");
             return result.decodeUint256();
+        }
+    }
+
+    function _makeCall(address asset, bytes memory assetData) private {
+        bytes memory result = asset.functionCall(assetData, "LOP: asset.call failed");
+        if (result.length > 0) {
+            require(result.length == 32 && result.decodeBool(), "LOP: asset.call bad result");
         }
     }
 }
