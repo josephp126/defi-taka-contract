@@ -163,5 +163,18 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
             unchecked { remainingMakerAmount -= 1; }
         }
 
+        // Check if order is valid
+        if (order.predicate.length > 0) {
+            require(checkPredicate(order), "LOP: predicate returned false");
+        }
+
+
+    }
+
+    /// @notice Checks order predicate
+    function checkPredicate(Order memory order) public view returns(bool) {
+        bytes memory result = address(this).functionStaticCall(order.predicate, "LOP: predicate call failed");
+        require(result.length == 32, "LOP: invalid predicate return");
+        return result.decodeBool();
     }
 }

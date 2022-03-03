@@ -15,4 +15,12 @@ library ArgumentsDecoder {
         return (target, args);
     }
 
+     function decodeBool(bytes memory data) internal pure returns(bool) {
+        bool value;
+        assembly { // solhint-disable-line no-inline-assembly
+            value := eq(mload(add(data, 0x20)), 1)
+        }
+        return value;
+    }
+
 }
