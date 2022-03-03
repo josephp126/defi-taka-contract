@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 /// @title Library with gas efficient alternatives to `abi.decode`
 library ArgumentsDecoder {
     
-    function decodeTargetAndCalldata(bytes memory data) internal pure returns(address, bytes memory) {
+    function decodeTargetAndData(bytes memory data) internal pure returns(address, bytes memory) {
         address target;
         bytes memory args;
         assembly {  // solhint-disable-line no-inline-assembly
@@ -31,4 +31,13 @@ library ArgumentsDecoder {
         return value;
     }
 
+    function decodeTargetAndCalldata(bytes calldata data) internal pure returns(address, bytes calldata) {
+        address target;
+        bytes calldata args;
+        assembly {  // solhint-disable-line no-inline-assembly
+            target := shr(96, calldataload(data.offset))
+        }
+        args = data[20:];
+        return (target, args);
+    }
 }

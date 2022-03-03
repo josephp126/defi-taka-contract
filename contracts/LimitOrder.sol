@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/utils/cryptography/draft-EIP712.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "hardhat/console.sol";
 
 import "./helpers/AmountCalculator.sol";
 import "./interfaces/InteractiveNotificationReceiver.sol";
@@ -144,7 +145,7 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
     ) external returns(uint256 /* actualMakingAmount */, uint256 /* actualTakingAmount */) {
         return fillOrderTo(order, signature, makingAmount, takingAmount, thresholdAmount, msg.sender);
     }
-    
+
     /// @notice Same as `fillOrder` but allows to specify funds destination instead of `msg.sender`
     /// @param order Order quote to fill
     /// @param signature Signature to confirm quote ownership
@@ -173,7 +174,7 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
                 remainingMakerAmount = order.makingAmount;
                 if (order.permit.length >= 20) {
                     // proceed only if permit length is enough to store address
-                    (address token, bytes memory permit) = order.permit.decodeTargetAndCalldata();
+                    (address token, bytes memory permit) = order.permit.decodeTargetAndData();
                     _permitMemory(token, permit);
                     require(_remaining[orderHash] == _ORDER_DOES_NOT_EXIST, "LOP: reentrancy detected");
                 }
@@ -235,7 +236,7 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
         // Maker can handle funds interactively
         if (order.interaction.length >= 20) {
             // proceed only if interaction length is enough to store address
-            (address interactionTarget, bytes memory interactionData) = order.interaction.decodeTargetAndCalldata();
+            (address interactionTarget, bytes memory interactionData) = order.interaction.decodeTargetAndData();
             InteractiveNotificationReceiver(interactionTarget).notifyFillOrder(
                 msg.sender, order.makerAsset, order.takerAsset, makingAmount, takingAmount, interactionData
             );
@@ -254,6 +255,32 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
         );
 
         return (makingAmount, takingAmount);
+    }
+
+    /// @notice Same as `fillOrder` but calls permit first,
+    /// allowing to approve token spending and make a swap in one transaction.
+    /// Also allows to specify funds destination instead of `msg.sender`
+    /// @param order Order quote to fill
+    /// @param signature Signature to confirm quote ownership
+    /// @param makingAmount Making amount
+    /// @param takingAmount Taking amount
+    /// @param thresholdAmount Specifies maximum allowed takingAmount when takingAmount is zero, otherwise specifies minimum allowed makingAmount
+    /// @param target Address that will receive swap funds
+    /// @param permit Should consist of abiencoded token address and encoded `IERC20Permit.permit` call.
+    /// @dev See tests for examples
+    function fillOrderToWithPermit(
+        Order memory order,
+        bytes calldata signature,
+        uint256 makingAmount,
+        uint256 takingAmount,
+        uint256 thresholdAmount,
+        address target,
+        bytes calldata permit
+    ) external returns(uint256 /* actualMakingAmount */, uint256 /* actualTakingAmount */) {
+        require(permit.length >= 20, "LOP: permit length too low");
+        (address token, bytes calldata permitData) = permit.decodeTargetAndCalldata();
+        _permit(token, permitData);
+        return fillOrderTo(order, signature, makingAmount, takingAmount, thresholdAmount, target);
     }
 
     /// @notice Checks order predicate
