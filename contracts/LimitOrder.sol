@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "./helpers/AmountCalculator.sol";
+import "./interfaces/InteractiveNotificationReceiver.sol";
 import "./libraries/ArgumentsDecoder.sol";
 import "./libraries/Permitable.sol";
 
@@ -146,61 +147,63 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
         require(target != address(0), "LOP: zero target is forbidden");
         bytes32 orderHash = hashOrder(order);
 
-        uint256 remainingMakerAmount = _remaining[orderHash];
-        require(remainingMakerAmount != _ORDER_FILLED, "LOP: remaining amount is 0");
-        require(order.allowedSender == address(0) || order.allowedSender == msg.sender, "LOP: private order");
-        if (remainingMakerAmount == _ORDER_DOES_NOT_EXIST) {
-            // First fill: validate order and permit maker asset
-            require(SignatureChecker.isValidSignatureNow(order.maker, orderHash, signature), "LOP: bad signature");
-            remainingMakerAmount = order.makingAmount;
-            if (order.permit.length >= 20) {
-                // proceed only if permit length is enough to store address
-                (address token, bytes memory permit) = order.permit.decodeTargetAndCalldata();
-                _permitMemory(token, permit);
-                require(_remaining[orderHash] == _ORDER_DOES_NOT_EXIST, "LOP: reentrancy detected");
+        {  // Stack too deep
+            uint256 remainingMakerAmount = _remaining[orderHash];
+            require(remainingMakerAmount != _ORDER_FILLED, "LOP: remaining amount is 0");
+            require(order.allowedSender == address(0) || order.allowedSender == msg.sender, "LOP: private order");
+            if (remainingMakerAmount == _ORDER_DOES_NOT_EXIST) {
+                // First fill: validate order and permit maker asset
+                require(SignatureChecker.isValidSignatureNow(order.maker, orderHash, signature), "LOP: bad signature");
+                remainingMakerAmount = order.makingAmount;
+                if (order.permit.length >= 20) {
+                    // proceed only if permit length is enough to store address
+                    (address token, bytes memory permit) = order.permit.decodeTargetAndCalldata();
+                    _permitMemory(token, permit);
+                    require(_remaining[orderHash] == _ORDER_DOES_NOT_EXIST, "LOP: reentrancy detected");
+                }
+            } else {
+                unchecked { remainingMakerAmount -= 1; }
             }
-        } else {
-            unchecked { remainingMakerAmount -= 1; }
-        }
 
-        // Check if order is valid
-        if (order.predicate.length > 0) {
-            require(checkPredicate(order), "LOP: predicate returned false");
-        }
-
-        // Compute maker and taker assets amount
-        if (takingAmount == 0 && makingAmount == 0) {
-            revert("LOP: only one amount should be 0");
-        } else if (takingAmount == 0) {
-            uint256 requestedMakingAmount = makingAmount;
-            if (makingAmount > remainingMakerAmount) {
-                makingAmount = remainingMakerAmount;
+            // Check if order is valid
+            if (order.predicate.length > 0) {
+                require(checkPredicate(order), "LOP: predicate returned false");
             }
-            takingAmount = _callGetter(order.getTakerAmount, order.makingAmount, makingAmount, order.takingAmount);
-            // check that actual rate is not worse than what was expected
-            // takingAmount / makingAmount <= thresholdAmount / requestedMakingAmount
-            require(takingAmount * requestedMakingAmount <= thresholdAmount * makingAmount, "LOP: taking amount too high");
-        } else {
-            uint256 requestedTakingAmount = takingAmount;
-            makingAmount = _callGetter(order.getMakerAmount, order.takingAmount, takingAmount, order.makingAmount);
-            if (makingAmount > remainingMakerAmount) {
-                makingAmount = remainingMakerAmount;
+
+            // Compute maker and taker assets amount
+            if (takingAmount == 0 && makingAmount == 0) {
+                revert("LOP: only one amount should be 0");
+            } else if (takingAmount == 0) {
+                uint256 requestedMakingAmount = makingAmount;
+                if (makingAmount > remainingMakerAmount) {
+                    makingAmount = remainingMakerAmount;
+                }
                 takingAmount = _callGetter(order.getTakerAmount, order.makingAmount, makingAmount, order.takingAmount);
+                // check that actual rate is not worse than what was expected
+                // takingAmount / makingAmount <= thresholdAmount / requestedMakingAmount
+                require(takingAmount * requestedMakingAmount <= thresholdAmount * makingAmount, "LOP: taking amount too high");
+            } else {
+                uint256 requestedTakingAmount = takingAmount;
+                makingAmount = _callGetter(order.getMakerAmount, order.takingAmount, takingAmount, order.makingAmount);
+                if (makingAmount > remainingMakerAmount) {
+                    makingAmount = remainingMakerAmount;
+                    takingAmount = _callGetter(order.getTakerAmount, order.makingAmount, makingAmount, order.takingAmount);
+                }
+                // check that actual rate is not worse than what was expected
+                // makingAmount / takingAmount >= thresholdAmount / requestedTakingAmount
+                require(makingAmount * requestedTakingAmount >= thresholdAmount * takingAmount, "LOP: making amount too low");
             }
-            // check that actual rate is not worse than what was expected
-            // makingAmount / takingAmount >= thresholdAmount / requestedTakingAmount
-            require(makingAmount * requestedTakingAmount >= thresholdAmount * takingAmount, "LOP: making amount too low");
+
+            require(makingAmount > 0 && takingAmount > 0, "LOP: can't swap 0 amount");
+
+            // Update remaining amount in storage
+            unchecked {
+                remainingMakerAmount = remainingMakerAmount - makingAmount;
+                _remaining[orderHash] = remainingMakerAmount + 1;
+            }
+            emit OrderFilled(msg.sender, orderHash, remainingMakerAmount);
         }
-
-        require(makingAmount > 0 && takingAmount > 0, "LOP: can't swap 0 amount");
-
-        // Update remaining amount in storage
-        unchecked {
-            remainingMakerAmount = remainingMakerAmount - makingAmount;
-            _remaining[orderHash] = remainingMakerAmount + 1;
-        }
-        emit OrderFilled(msg.sender, orderHash, remainingMakerAmount);
-
+        
         // Taker => Maker
         _makeCall(
             order.takerAsset,
@@ -212,6 +215,15 @@ abstract contract LimitOrder is EIP712, AmountCalculator, Permitable {
                 order.takerAssetData
             )
         );
+
+        // Maker can handle funds interactively
+        if (order.interaction.length >= 20) {
+            // proceed only if interaction length is enough to store address
+            (address interactionTarget, bytes memory interactionData) = order.interaction.decodeTargetAndCalldata();
+            InteractiveNotificationReceiver(interactionTarget).notifyFillOrder(
+                msg.sender, order.makerAsset, order.takerAsset, makingAmount, takingAmount, interactionData
+            );
+        }
 
         // Maker => Taker
         _makeCall(
